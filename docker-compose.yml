@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Backend FastAPI Service
+  backend:
+    build: ./backend
+    container_name: butcher-backend
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Frontend React Service
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # You can pass your backend's public URL here during the build
+        VITE_API_URL: http://localhost:8000 
+    container_name: butcher-frontend
+    ports:
+      - "5173:80" # Maps the container's port 80 to your computer's port 5173
+    depends_on:
+      - backend
+
+  # PostgreSQL Database Service
+  db:
+    image: postgres:13-alpine
+    container_name: butcher-db
+    environment:
+      POSTGRES_USER: postgres # Use a secure user
+      POSTGRES_PASSWORD:2003 # Use a secure password
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U your_db_user -d butchersguide"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
