@@ -14,7 +14,13 @@ class Settings(BaseSettings):
     MAIL_SSL_TLS: bool
     ADMIN_EMAIL: str
 
+    # --- Google OAuth ---
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+
+
     class Config:
         env_file = ".env"
+        extra = "ignore"  # <-- ADD THIS LINE
 
 settings = Settings()

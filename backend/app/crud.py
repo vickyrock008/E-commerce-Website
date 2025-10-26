@@ -118,44 +118,11 @@ def get_order_for_email(db: Session, order_id: int):
         joinedload(models.Order.items)
     ).filter(models.Order.id == order_id).first()
 
-def create_order(db: Session, order_data: schemas.OrderCreate, user_id: int):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user: return None
-
-    total = 0.0
-    order_items_to_create = []
-
-    for it in order_data.items:
-        prod = get_product(db, it.product_id)
-        if not prod or prod.stock < it.qty: return None
-        subtotal = prod.price * it.qty
-        total += subtotal
-        order_items_to_create.append({
-            "product_id": prod.id, "product_name": prod.name, "qty": it.qty,
-            "subtotal": subtotal, "product_instance": prod,
-        })
-
-    order = models.Order(
-        customer_id=user.id, total=total, customer_name=order_data.customer_name,
-        customer_phone=order_data.customer_phone, customer_address=order_data.customer_address
-    )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
-
-    for item_data in order_items_to_create:
-        item = models.OrderItem(
-            order_id=order.id, product_id=item_data["product_id"], product_name=item_data["product_name"],
-            qty=item_data["qty"], subtotal=item_data["subtotal"]
-        )
-        db.add(item)
-        product_instance = item_data["product_instance"]
-        product_instance.stock -= item_data["qty"]
-
-    db.commit()
-    db.refresh(order)
-    return order
-
+#
+# ▼▼▼ FIX WAS HERE ▼▼▼
+# You had two 'create_order' functions. I removed the first,
+# as this is the correct one that includes the 'order_uid' logic.
+#
 def create_order(db: Session, order_data: schemas.OrderCreate, user_id: int):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user: return None

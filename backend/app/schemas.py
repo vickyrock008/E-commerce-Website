@@ -1,13 +1,13 @@
 # app/schemas.py
 
-from pydantic import BaseModel, EmailStr # ✨ 1. Import EmailStr to fix the error
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 import datetime
 
 # --- Schemas for Users ---
 class UserBase(BaseModel):
     name: str
-    email: EmailStr # This will now work correctly
+    email: EmailStr
 
 class UserCreate(UserBase):
     password: str
@@ -18,6 +18,20 @@ class UserOut(UserBase):
     role: str
     class Config:
         from_attributes = True
+        
+#
+# ▼▼▼ THESE SCHEMAS WERE MISSING ▼▼▼
+#
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserOut
+
+class GoogleToken(BaseModel):
+    token: str
+#
+# ▲▲▲ END OF MISSING SCHEMAS ▲▲▲
+#
 
 # --- Schemas for Password Reset ---
 class ForgotPasswordRequest(BaseModel):
@@ -32,7 +46,8 @@ class ProductBase(BaseModel):
     name: str
     price: float
     description: Optional[str] = None
-    image: str
+    # ✨ Make image optional, it will be handled by the form
+    image: Optional[str] = None
     category_id: int
 
 class ProductCreate(ProductBase):
@@ -42,8 +57,11 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     price: Optional[float] = None
     description: Optional[str] = None
+    # ✨ Also allow image to be updated
     image: Optional[str] = None
     category_id: Optional[int] = None
+    # ✨ Allow stock to be updated via this form
+    stock: Optional[int] = None
 
 class ProductOut(ProductBase):
     id: int

@@ -20,6 +20,11 @@ async def send_admin_notification_with_delay(order_id: int):
     await asyncio.sleep(10) # A generous 10-second non-blocking delay
     await send_new_order_admin_notification(order_id=order_id)
 
+#
+# ▼▼▼ FIX WAS HERE ▼▼▼
+# You had two 'checkout' functions defined for "POST /".
+# I have removed the first, duplicate one.
+#
 
 @router.post("/")
 def checkout(order: schemas.OrderCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -32,16 +37,6 @@ def checkout(order: schemas.OrderCreate, background_tasks: BackgroundTasks, db: 
     
     # Task 2: Send the admin notification using our new, delayed function.
     background_tasks.add_task(send_admin_notification_with_delay, order_id=created.id)
-    
-    return {"order_id": created.id, "total": created.total, "status": created.status}
-
-@router.post("/")
-def checkout(order: schemas.OrderCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    created = crud.create_order(db, order_data=order, user_id=order.user_id)
-    if not created:
-        raise HTTPException(status_code=400, detail="Could not create order.")
-    
-    # ... (background tasks remain the same) ...
     
     # ✨ 6. Return the new professional ID in the response
     return {"order_uid": created.order_uid, "total": created.total, "status": created.status}

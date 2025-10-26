@@ -16,7 +16,11 @@ class User(Base):
     hashed_password = Column(String)
     is_active = Column(Integer, default=1)
     role = Column(String, default="user")
+    
+    # ▼▼▼ THIS LINE WAS FIXED ▼▼▼
+    # It no longer contains 'unique=Type,"'
     reset_token = Column(String, unique=True, index=True, nullable=True)
+    
     reset_token_expires = Column(DateTime, nullable=True)
     orders = relationship("Order", back_populates="customer")
 
@@ -78,7 +82,11 @@ class ContactSubmission(Base):
     message = Column(Text)
     submitted_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-
+#
+# ▼▼▼ FIX WAS HERE ▼▼▼
+# These functions are now correctly indented at the top level of the file,
+# NOT inside the ContactSubmission class.
+#
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 

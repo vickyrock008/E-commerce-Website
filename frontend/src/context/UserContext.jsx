@@ -1,4 +1,8 @@
+// src/context/UserContext.jsx
+
 import React, { createContext, useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast'; // <--- FIX 1: IMPORT TOAST
+import api from '../api/axiosConfig';     // <--- FIX 2: IMPORT API
 
 export const UserContext = createContext(null);
 
@@ -43,8 +47,36 @@ export default function UserContextProvider({ children }) {
     window.location.href = '/';
   };
 
+
+  const loginWithGoogle = (credentialResponse, navigate) => {
+    return toast.promise(
+      // Send the Google token to our new backend endpoint
+      api.post('/api/auth/google', {
+        token: credentialResponse.credential,
+      }),
+      {
+        loading: 'Signing in...',
+        success: (response) => {
+          // On success, get the user and our custom JWT from the backend
+          const { user, access_token } = response.data;
+          
+          // Use the existing login function to save the session
+          login(user, access_token);
+          
+          // Send them to the dashboard or home
+          navigate(user.role === 'admin' ? '/admin' : '/dashboard');
+          return 'Login successful!';
+        },
+        error: 'Google sign-in failed. Please try again.',
+      }
+    );
+  };
+
   return (
-    <UserContext.Provider value={{ user, token, login, logout, loading }}>
+    <UserContext.Provider
+      // ✨ 4. Add loginWithGoogle to the value prop
+      value={{ user, token, login, logout, loading, loginWithGoogle }}
+    >
       {children}
     </UserContext.Provider>
   );

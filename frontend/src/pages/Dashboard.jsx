@@ -1,67 +1,70 @@
+// src/pages/Dashboard.jsx
+
 import React, { useContext, useEffect, useState } from 'react';
 import api from '../api/axiosConfig';
 import { UserContext } from '../context/UserContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { X } from 'lucide-react'; // Import the 'X' icon
+import { X, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion'; // <--- THIS WAS THE MISSING IMPORT
 
-// ✨ 1. New, professional modal for confirming cancellation
+import dashboardBgImage from '@/assets/images/bg_img/about.png';
+
+// Modal Component for Confirming Cancellation
 const ConfirmCancelModal = ({ order, onClose, onConfirm }) => {
-    if (!order) return null;
+  if (!order) return null;
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
-                <button onClick={onClose} className="absolute top-3 right-3 text-gray-500 hover:text-gray-800">
-                  <X size={24} />
-                </button>
-                <h2 className="text-xl font-bold mb-2">Confirm Cancellation</h2>
-                <p className="text-gray-600">Are you sure you want to cancel Order #{order.id}? This action cannot be undone.</p>
-                <div className="mt-6 flex justify-end space-x-3">
-                    <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">
-                        Nevermind
-                    </button>
-                    <button type="button" onClick={() => onConfirm(order.id)} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
-                        Yes, Cancel Order
-                    </button>
-                </div>
-            </div>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
+          <X size={24} />
+        </button>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">Confirm Cancellation</h2>
+        <p className="text-gray-600 mb-6">Are you sure you want to cancel Order <span className="font-bold text-red-600">#{order.order_uid}</span>? This action cannot be undone.</p>
+        <div className="flex justify-end space-x-3">
+          <button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition-colors">
+            Nevermind
+          </button>
+          <button type="button" onClick={() => onConfirm(order.id)} className="px-6 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors">
+            Yes, Cancel Order
+          </button>
         </div>
-    );
+      </div>
+    </div>
+  );
 };
 
-
 export default function Dashboard() {
-  const { user, loading, token } = useContext(UserContext);
+  const { user, loading: userLoading, token } = useContext(UserContext);
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
-  // ✨ 2. Add state to manage the new modal
   const [cancelModalOrder, setCancelModalOrder] = useState(null);
 
   const fetchOrders = () => {
     if (token) {
-        setOrdersLoading(true);
-        api.get(`/api/users/me/orders`)
-            .then(response => { setOrders(response.data); })
-            .catch(error => { console.error("Failed to fetch orders:", error); })
-            .finally(() => { setOrdersLoading(false); });
+      setOrdersLoading(true);
+      api.get(`/api/users/me/orders`)
+        .then(response => { setOrders(response.data); })
+        .catch(error => { toast.error("Failed to fetch orders."); })
+        .finally(() => { setOrdersLoading(false); });
     } else {
-        setOrdersLoading(false);
+      setOrdersLoading(false);
     }
   }
 
   useEffect(() => {
-    if (!loading) {
+    if (!userLoading) {
       if (!token) {
+        toast.error("Please log in to view your dashboard.");
         navigate('/login');
       } else if (user) {
         fetchOrders();
       }
     }
-  }, [user, token, loading, navigate]);
+  }, [user, token, userLoading, navigate]);
 
-  // ✨ 3. This function is now called when the user confirms in the modal
   const handleConfirmCancel = (orderId) => {
     toast.promise(
       api.put(`/api/users/me/orders/${orderId}/cancel`),
@@ -72,76 +75,136 @@ export default function Dashboard() {
           setCancelModalOrder(null); // Close the modal
           return 'Order cancelled successfully.';
         },
-        error: 'Failed to cancel order. It may have already been shipped.',
+        error: 'Failed to cancel order. It may have already been shipped or processed.',
       }
     );
   };
 
-  if (loading || !user) {
-    return <div className="text-center p-12">Loading...</div>;
+  const getStatusChipClass = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'delivered':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (userLoading || !user) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <Loader2 className="w-12 h-12 animate-spin text-red-600" />
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-4">Welcome, {user.name}!</h1>
-      <p className="text-gray-600 mb-8">Here you can view your past orders.</p>
+    <>
+      <div
+        className="w-full min-h-screen page-section"
+        style={{
+          backgroundImage: `url(${dashboardBgImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        <div className="container mx-auto max-w-5xl">
+          <motion.h1 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-4xl font-bold mb-4 text-gray-800"
+          >
+            Welcome, {user.name}!
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-xl text-gray-600 mb-10"
+          >
+            Here you can view and manage your past orders.
+          </motion.p>
 
-      <div className="bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold mb-6 border-b pb-4">Your Order History</h2>
-        {ordersLoading ? ( <p>Loading your orders...</p> ) : 
-         orders.length === 0 ? ( <p>You haven't placed any orders yet.</p> ) : (
-          <div className="space-y-6">
-            {orders.map(order => (
-              <div key={order.id} className="border rounded-lg p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <div>
-                    <p className="font-bold text-lg">Order #{order.order_uid}</p>
-                    <p className="text-sm text-gray-500">
-                      Placed on: {new Date(order.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg">Total: ₹{order.total.toFixed(2)}</p>
-                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full capitalize">
-                      {order.status}
-                    </span>
-                  </div>
-                </div>
-                <div className="border-t pt-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-semibold mb-2">Items:</h4>
-                      <ul className="list-disc list-inside space-y-1">
-                        {order.items.map((item, index) => (
-                          <li key={index}>
-                            {item.qty} x {item.product_name} - ₹{item.subtotal.toFixed(2)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    {order.status === 'pending' && (
-                      // ✨ 4. This button now opens the modal instead of the old popup
-                      <button
-                        onClick={() => setCancelModalOrder(order)}
-                        className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                      >
-                        Cancel Order
-                      </button>
-                    )}
-                  </div>
-                </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white/90 backdrop-blur-md p-6 md:p-8 rounded-2xl shadow-2xl"
+          >
+            <h2 className="text-2xl font-semibold mb-6 border-b pb-4 text-gray-800">Your Order History</h2>
+            {ordersLoading ? (
+              <div className="flex justify-center items-center p-12">
+                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+                <span className="ml-3 text-lg text-gray-600">Loading your orders...</span>
               </div>
-            ))}
-          </div>
-        )}
+            ) : orders.length === 0 ? (
+              <div className="text-center p-12">
+                <p className="text-lg text-gray-600">You haven't placed any orders yet.</p>
+                <Link 
+                  to="/shop" 
+                  className="mt-6 inline-block bg-red-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg hover:bg-red-700 transition-colors"
+                >
+                  Start Shopping
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {orders.map(order => (
+                  <div key={order.id} className="bg-white/70 border border-gray-200 rounded-xl p-4 md:p-6 shadow-md">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-4">
+                      <div>
+                        <p className="font-bold text-xl text-red-700">Order #{order.order_uid}</p>
+                        <p className="text-sm text-gray-500">
+                          Placed on: {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="text-left md:text-right mt-3 md:mt-0">
+                        <p className="font-bold text-xl text-gray-800">Total: ₹{order.total.toFixed(2)}</p>
+                        <span className={`text-sm font-medium px-3 py-1 rounded-full capitalize ${getStatusChipClass(order.status)}`}>
+                          {order.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="border-t pt-4">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div>
+                          <h4 className="font-semibold text-gray-700 mb-2">Items:</h4>
+                          <ul className="list-disc list-inside space-y-1 text-gray-600 pl-2">
+                            {order.items.map((item, index) => (
+                              <li key={index}>
+                                {item.qty} x {item.product_name} - <span className="font-medium">₹{item.subtotal.toFixed(2)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        {order.status === 'pending' && (
+                          <button
+                            onClick={() => setCancelModalOrder(order)}
+                            className="bg-red-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors mt-4 md:mt-0 self-start md:self-center"
+                          >
+                            Cancel Order
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </div>
       </div>
 
-      {/* ✨ 5. Render the modal when an order is selected for cancellation */}
+      {/* Render the modal */}
       <ConfirmCancelModal
         order={cancelModalOrder}
         onClose={() => setCancelModalOrder(null)}
         onConfirm={handleConfirmCancel}
       />
-    </div>
+    </>
   );
 }

@@ -1,12 +1,21 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg2-binary
-python-multipart
-pydantic
-pydantic-settings
-jinja2
-python-dotenv
-passlib[bcrypt]
-python-jose[cryptography]
-fastapi-mail
+# Save this as requirements.txt in your 'backend' directory
+
+# --- Core Framework ---
+fastapi[all]             # The web framework. [all] includes uvicorn, pydantic[email], etc.
+uvicorn[standard]        # The ASGI server to run your app
+python-multipart         # Required for FastAPI to handle file uploads (Form, File, UploadFile)
+
+# --- Database (ORM) ---
+sqlalchemy               # The core ORM
+psycopg2-binary          # Driver for PostgreSQL. Replace if using a different DB (e.g., mysqlclient)
+
+# --- Security & Auth ---
+passlib[bcrypt]          # For hashing passwords (the [bcrypt] part is important)
+python-jose[cryptography] # For creating and verifying JWT access tokens
+google-auth              # For verifying Google OAuth2 tokens
+
+# --- Configuration & Utilities ---
+pydantic-settings        # For loading secrets from your .env file
+
+# --- Email ---
+fastapi-mail             # For sending emails with templates
