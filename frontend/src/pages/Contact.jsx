@@ -5,18 +5,20 @@ import api from '../api/axiosConfig';
 import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Send, ChevronDown } from 'lucide-react';
+import FormInput from '../components/FormInput'; // <-- ▼▼▼ FIX 1: IMPORT the stable component ▼▼▼
 
 // Using one of the provided images
 import contactBgImage from '../assets/images/bg_img/contact.png';
 
 const faqData = [
+  // ... (faq data remains the same)
   {
     question: "Do you offer delivery services?",
     answer: "Yes, we offer delivery within a 50-mile radius of our shop. You can select the delivery option at checkout."
   },
   {
     question: "What are your business hours?",
-    answer: "Our shop is open Monday to Saturday from 9:00 AM to 6:00 PM. We are closed on Sundays."
+    answer: "Our shop is open Monday to Saturday from 7:00 AM to 5:00 PM."
   },
   {
     question: "Can I place a custom order?",
@@ -66,22 +68,7 @@ export default function Contact() {
     );
   };
 
-  const FormInput = ({ label, name, type = 'text', required = false, value, onChange }) => (
-    <div>
-      <label htmlFor={name} className="block text-sm font-medium text-gray-700">
-        {label} {required && '*'}
-      </label>
-      <input
-        type={type}
-        name={name}
-        id={name}
-        value={value}
-        onChange={onChange}
-        className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-red-500 focus:border-red-500"
-        required={required}
-      />
-    </div>
-  );
+  // <-- ▼▼▼ FIX 2: REMOVED the FormInput definition from here ▼▼▼
 
   return (
     <div
@@ -120,9 +107,19 @@ export default function Contact() {
           >
             <h2 className="text-3xl font-bold text-gray-800 mb-6">Send Us a Message</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* These now use the imported FormInput component */}
               <FormInput label="Name" name="name" value={formData.name} onChange={handleInputChange} required />
               <FormInput label="Email Address" name="email" type="email" value={formData.email} onChange={handleInputChange} required />
-              <FormInput label="Phone Number (Optional)" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
+              
+              <FormInput 
+                label="Phone Number (Optional)" 
+                name="phone" 
+                type="text" 
+                value={formData.phone} 
+                onChange={handleInputChange} 
+                inputMode="tel" // The inputMode prop still works perfectly
+              />
+              
               <div>
                 <label htmlFor="message" className="block text-sm font-medium text-gray-700">
                   Your Inquiry *
