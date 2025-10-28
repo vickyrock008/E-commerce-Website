@@ -418,7 +418,7 @@ export default function Home({ addToCart }) {
                 variants={fadeInUp}
                 className="text-xl font-bold uppercase tracking-wider mt-8"
               >
-                - Subash.
+                - Vignesh.
               </motion.h4>
             </motion.div>
         </div>
