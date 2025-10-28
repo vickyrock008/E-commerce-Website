@@ -4,17 +4,26 @@ import React from "react";
 import placeholderImage from '../assets/images/beef_images/img1.jpg';
 import { ShoppingCart } from 'lucide-react';
 
+// ✨ 1. Get the API Base URL from environment variables
+const apiBaseUrl = import.meta.env.VITE_API_URL || '';
+
 export default function ProductCard({ product, addToCart }) {
   if (!product) return null;
 
   const hasStock = product.stock > 0;
+
+  // ✨ 2. Create the full, absolute URL for the image
+  const fullImageUrl = product.image 
+    ? `${apiBaseUrl}${product.image}` 
+    : placeholderImage;
 
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col justify-between group transition-all duration-300 hover:shadow-2xl">
       <div>
         <div className="relative overflow-hidden h-56">
           <img
-            src={product.image || placeholderImage}
+            // ✨ 3. Use the new fullImageUrl variable
+            src={fullImageUrl}
             alt={product.name || "Product image"}
             className="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-110"
             onError={(e) => { e.target.src = placeholderImage }}
