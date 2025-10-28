@@ -1,130 +1,187 @@
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+# app/email.py
+
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 from pathlib import Path
 from datetime import datetime
-import asyncio
 from .config import settings
 from .database import SessionLocal
 from . import crud
 
-conf = ConnectionConfig(
-    MAIL_USERNAME=settings.MAIL_USERNAME, MAIL_PASSWORD=settings.MAIL_PASSWORD,
-    MAIL_FROM=settings.MAIL_FROM, MAIL_PORT=settings.MAIL_PORT,
-    MAIL_SERVER=settings.MAIL_SERVER, MAIL_STARTTLS=settings.MAIL_STARTTLS,
-    MAIL_SSL_TLS=settings.MAIL_SSL_TLS, USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True, TEMPLATE_FOLDER=Path(__file__).parent / 'templates',
-)
-fm = FastMail(conf)
-
+# --- Helper function to generate HTML for order items ---
 def generate_items_html(items):
     html = ""
     for item in items:
-        html += f"<tr><td>{item.product_name}</td><td>{item.qty}</td><td>₹{item.subtotal:.2f}</td></tr>"
+        html += f"""
+        <tr>
+            <td style="padding: 12px 0; border-bottom: 1px solid #dee2e6;">{item.product_name}</td>
+            <td style="padding: 12px 0; border-bottom: 1px solid #dee2e6;">{item.qty}</td>
+            <td style="text-align: right; padding: 12px 0; border-bottom: 1px solid #dee2e6;">₹{item.subtotal:.2f}</td>
+        </tr>
+        """
     return html
+
+# --- General Template Data ---
+def get_base_template_body():
+    return {
+        "logo_url": f"{settings.BACKEND_URL}/static/images/logo.png",
+        "year": datetime.utcnow().year,
+        "shop_new_arrivals_link": f"{settings.FRONTEND_URL}/lookbook",
+        "continue_shopping_link": f"{settings.FRONTEND_URL}/shop"
+    }
+
+# --- Central Email Sending Function ---
+async def send_email(to_email: str, subject: str, template_name: str, template_body: dict):
+    """
+    Constructs and sends an email using the SendGrid Web API.
+    """
+    template_path = Path(__file__).parent / 'templates' / template_name
+    html_content = template_path.read_text()
+
+    for key, value in template_body.items():
+        html_content = html_content.replace(f"{{{{ {key} }}}}", str(value))
+    
+    if 'items_html' in template_body:
+         html_content = html_content.replace("{{ items_html | safe }}", template_body['items_html'])
+
+    message = Mail(
+        from_email=settings.MAIL_FROM,
+        to_emails=to_email,
+        subject=subject,
+        html_content=html_content
+    )
+    try:
+        sg = SendGridAPIClient(settings.MAIL_PASSWORD)
+        # FIX: The sendgrid library's send method is not async, so we remove 'await'
+        response = sg.send(message)
+        print(f"✅ Email sent to {to_email}. Status code: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Failed to send email to {to_email}. Error: {e}")
+
+# --- Email Sending Functions ---
+
+async def send_password_reset_email(email_to: str, user_name: str, token: str):
+    template_body = get_base_template_body()
+    template_body.update({
+        "customer_name": user_name,
+        "reset_link": f"{settings.FRONTEND_URL}/reset-password?token={token}"
+    })
+    await send_email(
+        to_email=email_to,
+        subject="Your Password Reset Link for The Outfit Oracle",
+        template_name="password_reset.html",
+        template_body=template_body
+    )
 
 async def send_order_confirmation_email(email_to: str, order_id: int):
     db = SessionLocal()
     try:
-        order_details = crud.get_order_for_email(db, order_id)
-        if not order_details:
-            print(f"❌ Could not find order #{order_id} to send confirmation email.")
-            return
-        items_html = generate_items_html(order_details.items)
-        template_body = { "customer_name": order_details.customer_name, "order_uid": order_details.order_uid, "items_html": items_html, "total": f"{order_details.total:.2f}", "address": order_details.customer_address, "year": datetime.utcnow().year }
-        message = MessageSchema(subject="Your Classic Meat & Products Order Confirmation", recipients=[email_to], template_body=template_body, subtype="html")
-        await fm.send_message(message, template_name="order_confirmation.html")
-        print(f"✅ Order confirmation email sent to {email_to} for order #{order_details.order_uid}")
-    except Exception as e:
-        print(f"❌ Failed to send order confirmation email. Error: {e}")
+        order = crud.get_order_for_email(db, order_id)
+        if not order: return
+
+        template_body = get_base_template_body()
+        template_body.update({
+            "customer_name": order.customer_name,
+            "order_id": order.order_uid,
+            "items_html": generate_items_html(order.items),
+            "total": f"{order.total:.2f}",
+            "address": order.customer_address,
+        })
+        await send_email(
+            to_email=email_to,
+            subject="Your The Outfit Oracle Order Confirmation",
+            template_name="order_confirmation.html",
+            template_body=template_body
+        )
     finally:
         db.close()
-
-async def send_new_order_admin_notification(order_id: int):
-    db = SessionLocal()
-    try:
-        order_details = crud.get_order_for_email(db, order_id)
-        if not order_details:
-            print(f"❌ Could not find order #{order_id} to send admin notification.")
-            return
-        items_html = generate_items_html(order_details.items)
-        template_body = { "customer_name": order_details.customer_name, "customer_phone": order_details.customer_phone, "order_uid": order_details.order_uid, "items_html": items_html, "total": f"{order_details.total:.2f}", "address": order_details.customer_address, }
-        message = MessageSchema(subject=f"New Order Received! (#{order_details.order_uid})", recipients=[settings.ADMIN_EMAIL], template_body=template_body, subtype="html")
-        await fm.send_message(message, template_name="new_order_admin_notification.html")
-        print(f"✅ Admin notification sent for order #{order_details.order_uid}")
-    except Exception as e:
-        print(f"❌ Failed to send admin notification. Error: {e}")
-    finally:
-        db.close()
-
-async def send_all_order_emails(customer_email: str, order_id: int):
-    await send_order_confirmation_email(email_to=customer_email, order_id=order_id)
-    print("--- Waiting 10 seconds before sending admin email... ---")
-    await asyncio.sleep(10)
-    await send_new_order_admin_notification(order_id=order_id)
 
 async def send_order_delivered_email(email_to: str, order_id: int):
     db = SessionLocal()
     try:
-        order_details = crud.get_order_for_email(db, order_id)
-        if not order_details:
-            print(f"❌ Could not find order #{order_id} to send delivered email.")
-            return
-        template_body = { "customer_name": order_details.customer_name, "order_uid": order_details.order_uid, "year": datetime.utcnow().year }
-        message = MessageSchema(subject="Your Classic Meat & Products Order Has Been Delivered!", recipients=[email_to], template_body=template_body, subtype="html")
-        await fm.send_message(message, template_name="order_delivered.html")
-        print(f"✅ Order delivered email sent to {email_to} for order #{order_details.order_uid}")
-    except Exception as e:
-        print(f"❌ Failed to send delivered email. Error: {e}")
+        order = crud.get_order_for_email(db, order_id)
+        if not order: return
+
+        template_body = get_base_template_body()
+        template_body.update({
+            "customer_name": order.customer_name,
+            "order_id": order.order_uid,
+        })
+        await send_email(
+            to_email=email_to,
+            subject="Your The Outfit Oracle Order Has Been Delivered!",
+            template_name="order_delivered.html",
+            template_body=template_body
+        )
     finally:
         db.close()
 
 async def send_order_cancelled_email(email_to: str, order_id: int):
     db = SessionLocal()
     try:
-        order_details = crud.get_order_for_email(db, order_id)
-        if not order_details:
-            print(f"❌ Could not find order #{order_id} to send cancelled email.")
-            return
-        template_body = { "customer_name": order_details.customer_name, "order_uid": order_details.order_uid, "year": datetime.utcnow().year }
-        message = MessageSchema(subject="Your Classic Meat & Products Order Has Been Cancelled", recipients=[email_to], template_body=template_body, subtype="html")
-        await fm.send_message(message, template_name="order_cancelled.html")
-        print(f"✅ Order cancelled email sent to {email_to} for order #{order_details.order_uid}")
-    except Exception as e:
-        print(f"❌ Failed to send cancelled email. Error: {e}")
+        order = crud.get_order_for_email(db, order_id)
+        if not order: return
+
+        template_body = get_base_template_body()
+        template_body.update({
+            "customer_name": order.customer_name,
+            "order_id": order.order_uid,
+        })
+        await send_email(
+            to_email=email_to,
+            subject="Your The Outfit Oracle Order Has Been Cancelled",
+            template_name="order_cancelled.html",
+            template_body=template_body
+        )
+    finally:
+        db.close()
+
+# --- ADMIN NOTIFICATION FUNCTIONS ---
+
+async def send_new_order_admin_notification(order_id: int):
+    db = SessionLocal()
+    try:
+        order = crud.get_order_for_email(db, order_id)
+        if not order: return
+
+        template_body = {
+            **get_base_template_body(),
+            "order_id": order.order_uid,
+            "customer_name": order.customer_name,
+            "customer_phone": order.customer_phone,
+            "address": order.customer_address,
+            "items_html": generate_items_html(order.items),
+            "total": f"{order.total:.2f}",
+            "admin_order_link": f"{settings.FRONTEND_URL}/admin/orders/{order.order_uid}"
+        }
+        await send_email(
+            to_email=settings.ADMIN_EMAIL,
+            subject=f"New Order Received! (#{order.order_uid})",
+            template_name="new_order_admin_notification.html",
+            template_body=template_body
+        )
     finally:
         db.close()
         
-# ✨ ADD THIS NEW FUNCTION for the admin cancellation notification
 async def send_order_cancelled_admin_notification(order_id: int):
     db = SessionLocal()
     try:
-        order_details = crud.get_order_for_email(db, order_id)
-        if not order_details:
-            print(f"❌ Could not find order #{order_id} to send admin cancellation notification.")
-            return
+        order = crud.get_order_for_email(db, order_id)
+        if not order: return
 
-        template_body = { 
-            "customer_name": order_details.customer_name, 
-            "order_uid": order_details.order_uid, 
+        template_body = {
+            **get_base_template_body(),
+            "customer_name": order.customer_name, 
+            "order_uid": order.order_uid, 
+            "admin_order_link": f"{settings.FRONTEND_URL}/admin/orders/{order.order_uid}"
         }
-        message = MessageSchema(
-            subject=f"Notice: Order #{order_details.order_uid} has been cancelled",
-            recipients=[settings.ADMIN_EMAIL],
-            template_body=template_body,
-            subtype="html"
+        await send_email(
+            to_email=settings.ADMIN_EMAIL,
+            subject=f"Notice: Order #{order.order_uid} has been cancelled",
+            template_name="order_cancelled_admin_notification.html",
+            template_body=template_body
         )
-        await fm.send_message(message, template_name="order_cancelled_admin_notification.html")
-        print(f"✅ Admin cancellation notification sent for order #{order_details.order_uid}")
-    except Exception as e:
-        print(f"❌ Failed to send admin cancellation notification. Error: {e}")
     finally:
         db.close()
 
-async def send_password_reset_email(email_to: str, user_name: str, token: str):
-    reset_link = f"http://localhost:5173/reset-password?token={token}"
-    template_body = { "customer_name": user_name, "reset_link": reset_link, "year": datetime.utcnow().year }
-    message = MessageSchema(subject="Your Password Reset Link for Classic Meat & Products", recipients=[email_to], template_body=template_body, subtype="html")
-    try:
-        await fm.send_message(message, template_name="password_reset.html")
-        print(f"✅ Password reset email sent to {email_to}")
-    except Exception as e:
-        print(f"❌ Failed to send password reset email. Error: {e}")
