@@ -10,3 +10,4 @@ google-auth-oauthlib
 requests
 httpx
 python-multipart
+psycopg2-binary
