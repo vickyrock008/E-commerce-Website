@@ -18,6 +18,6 @@ google-auth
 requests
 
 # Email
-fastapi-mail
+
 
 python-multipart==0.0.6
