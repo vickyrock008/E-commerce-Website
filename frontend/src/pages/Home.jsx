@@ -170,12 +170,7 @@ export default function Home({ addToCart }) {
       .get(VITE_API_URL + '/api/products/')
       .then((r) => {
         if (Array.isArray(r.data)) {
-          // Add mock image URLs if not present in API data
-          const productsWithImages = r.data.map((p, index) => ({
-            ...p,
-            imageUrl: p.imageUrl || `https://placehold.co/400x300/f87171/ffffff?text=Premium+Cut+${index + 1}`
-          }));
-          setProducts(productsWithImages);
+          setProducts(r.data);
         } else {
           setProducts([]);
         }
