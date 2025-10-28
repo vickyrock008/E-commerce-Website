@@ -1,26 +1,29 @@
-
-### 3. Docker Files
-
-These files tell Docker how to build and run your application. They are complete and ready to use.
-
-#### **`Dockerfile` for the Backend**
-
-**Location**: `backend/Dockerfile`
-```dockerfile
-# Use an official Python runtime as a parent image
+# 1. Base Image
+# Use an official Python 3.10 slim image, as your .pyc files indicate CPython 3.10
 FROM python:3.10-slim
 
-# Set the working directory in the container
-WORKDIR /app
+# 2. Set Environment Variables
+# Prevents Python from buffering stdout and stderr
+ENV PYTHONUNBUFFERED=1
 
-# Copy the updated requirements file
-COPY ./requirements.txt /app/requirements.txt
+# 3. Set Working Directory
+WORKDIR /code
 
-# Install dependencies
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+# 4. Install Dependencies
+# Copy only the requirements file first to leverage Docker's build cache.
+# This step will only re-run if requirements.txt changes.
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir --upgrade pip -r requirements.txt
 
-# Copy the rest of the application's code
-COPY ./app /app/app
+# 5. Copy Application Code
+# Copy your entire 'app' directory into the container at /code/app
+COPY ./app ./app
 
-# Command to run the application on port 8000
+# 6. Expose Port
+# Expose the port uvicorn will run on
+EXPOSE 8000
+
+# 7. Run the Application
+# Run uvicorn. 'app.main:app' refers to the 'app' variable in your 'app/main.py' file.
+# --host 0.0.0.0 makes it accessible from outside the container.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
