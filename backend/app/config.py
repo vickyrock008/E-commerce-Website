@@ -15,12 +15,6 @@ class Settings(BaseSettings):
     MAIL_FROM: str
     ADMIN_EMAIL: str
     
-    # These are now optional as they were for the old SMTP method
-    MAIL_USERNAME: Optional[str] = None
-    MAIL_PORT: Optional[int] = None
-    MAIL_SERVER: Optional[str] = None
-    MAIL_STARTTLS: Optional[bool] = None
-    MAIL_SSL_TLS: Optional[bool] = None
 
 
     # --- Google OAuth ---
