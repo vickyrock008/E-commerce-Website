@@ -1,13 +1,26 @@
 fastapi==0.103.1
 uvicorn[standard]==0.23.2
 sqlalchemy==2.0.21
-pydantic[email]==2.4.2
-pydantic-settings==2.0.3
+
+--- FIXES ARE HERE ---
+
+1. Downgrade pydantic to v1 for fastapi-mail compatibility
+
+pydantic[email]<2
+pydantic-settings<2
+
+2. Add the missing fastapi-mail package
+
+fastapi-mail
+
+--- END OF FIXES ---
+
 passlib
 bcrypt==3.2.0
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.6
 google-auth==2.23.2
+google-auth-oauthlib # Often needed with google-auth for web flows
 httpx==0.25.0
 psycopg2-binary==2.9.7
 alembic==1.12.0
